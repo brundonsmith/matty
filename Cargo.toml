@@ -1,6 +1,6 @@
 [package]
 name = "matty"
-description = "A cute little matrix and vector library"
+description = "A neat matrix and vector library"
 version = "0.1.0"
 edition = "2021"
 
