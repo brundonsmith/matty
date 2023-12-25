@@ -6,20 +6,24 @@ use std::{
 
 use num_traits::real::Real;
 
-use crate::{utils::collect_arr, Element, Matrix};
+use crate::{Element, Matrix};
 
+/**
+ * Interface for vectors
+ */
 pub trait IVector<T: Element, const N: usize> {
     fn new(data: [T; N]) -> Self;
 
-    fn column_matrix(self) -> Matrix<T, N, 1>;
-
-    fn row_matrix(self) -> Matrix<T, 1, N>;
+    fn to_array(self) -> [T; N];
 
     fn dot(self, other: Self) -> T;
 
     fn cross(self, other: Self) -> Self;
 }
 
+/**
+ * Interface for vectors holding real numbers
+ */
 pub trait IRealVector<T: Element + Real, const N: usize> {
     fn magnitude(self) -> T;
 
@@ -28,20 +32,32 @@ pub trait IRealVector<T: Element + Real, const N: usize> {
     fn angle_to(self, other: Self) -> T;
 }
 
+/**
+ * Regular Vector struct. Can be used with any type of number and any number of
+ * elements. Implements various vector math operations.
+ */
 #[derive(Debug, Clone, Copy, PartialEq, PartialOrd)]
 pub struct Vector<T: Element, const N: usize> {
     data: [T; N],
+
+    #[cfg(feature = "remember_normalization")]
     normalized: bool,
 }
 
 impl<T: Element, const N: usize> Vector<T, N> {
     #[inline]
     pub fn resize<const N2: usize>(self) -> Vector<T, N2> {
-        collect_arr(
-            (0..(self.data.len().max(N2)))
-                .map(|i| self.data.get(i).map(|x| *x).unwrap_or(T::default())),
-        )
-        .into()
+        std::array::from_fn(|i| self.data.get(i).map(|x| *x).unwrap_or(T::default())).into()
+    }
+
+    #[inline]
+    pub fn column_matrix(self) -> Matrix<T, N, 1> {
+        std::array::from_fn(|i| [self.data[i]]).into()
+    }
+
+    #[inline]
+    pub fn row_matrix(self) -> Matrix<T, 1, N> {
+        [self.data].into()
     }
 }
 
@@ -50,18 +66,14 @@ impl<T: Element, const N: usize> IVector<T, N> for Vector<T, N> {
     fn new(data: [T; N]) -> Self {
         Self {
             data,
+            #[cfg(feature = "remember_normalization")]
             normalized: false,
         }
     }
 
     #[inline]
-    fn column_matrix(self) -> Matrix<T, N, 1> {
-        collect_arr(self.data.into_iter().map(|n| [n])).into()
-    }
-
-    #[inline]
-    fn row_matrix(self) -> Matrix<T, 1, N> {
-        [self.data].into()
+    fn to_array(self) -> [T; N] {
+        self.data
     }
 
     #[inline]
@@ -94,13 +106,19 @@ impl<T: Element + Real, const N: usize> IRealVector<T, N> for Vector<T, N> {
 
     #[inline]
     fn normalized(self) -> Vector<T, N> {
+        #[cfg(feature = "remember_normalization")]
         if self.normalized {
-            self
-        } else {
-            let mut res = self / self.magnitude();
-            res.normalized = true;
-            res
+            return self;
         }
+
+        let mut res = self / self.magnitude();
+
+        #[cfg(feature = "remember_normalization")]
+        {
+            res.normalized = true;
+        }
+
+        res
     }
 
     #[inline]
@@ -137,6 +155,7 @@ impl<T: Element, const N: usize> Default for Vector<T, N> {
     fn default() -> Self {
         Self {
             data: [T::default(); N].into(),
+            #[cfg(feature = "remember_normalization")]
             normalized: Default::default(),
         }
     }
@@ -144,20 +163,24 @@ impl<T: Element, const N: usize> Default for Vector<T, N> {
 
 /// From traits
 
-impl<T: Element, const N: usize, A> From<A> for Vector<T, N>
-where
-    A: Into<[T; N]>,
-{
+impl<T: Element, const N: usize> From<[T; N]> for Vector<T, N> {
     #[inline]
-    fn from(value: A) -> Self {
-        Vector::new(value.into())
+    fn from(value: [T; N]) -> Self {
+        Vector::new(value)
+    }
+}
+
+impl<T: Element, const N: usize> From<Vector<T, N>> for [T; N] {
+    #[inline]
+    fn from(value: Vector<T, N>) -> Self {
+        value.data
     }
 }
 
 impl<T: Element, const N: usize> From<Matrix<T, N, 1>> for Vector<T, N> {
     #[inline]
     fn from(value: Matrix<T, N, 1>) -> Self {
-        collect_arr((0..N).map(|i| value[i][0])).into()
+        std::array::from_fn(|i| value[i][0]).into()
     }
 }
 
@@ -168,13 +191,7 @@ impl<T: Element, const N: usize> Add<Vector<T, N>> for Vector<T, N> {
 
     #[inline]
     fn add(self, rhs: Vector<T, N>) -> Self::Output {
-        collect_arr(
-            self.data
-                .into_iter()
-                .zip(rhs.data.into_iter())
-                .map(|(l, r)| l + r),
-        )
-        .into()
+        std::array::from_fn(|i| self.data[i] + rhs.data[i]).into()
     }
 }
 
@@ -183,13 +200,7 @@ impl<T: Element, const N: usize> Sub<Vector<T, N>> for Vector<T, N> {
 
     #[inline]
     fn sub(self, rhs: Vector<T, N>) -> Self::Output {
-        collect_arr(
-            self.data
-                .into_iter()
-                .zip(rhs.data.into_iter())
-                .map(|(l, r)| l - r),
-        )
-        .into()
+        std::array::from_fn(|i| self.data[i] - rhs.data[i]).into()
     }
 }
 
@@ -198,7 +209,7 @@ impl<T: Element, const N: usize> Mul<T> for Vector<T, N> {
 
     #[inline]
     fn mul(self, rhs: T) -> Self::Output {
-        collect_arr(self.data.into_iter().map(|n| n * rhs)).into()
+        std::array::from_fn(|i| self.data[i] * rhs).into()
     }
 }
 
@@ -228,18 +239,22 @@ macro_rules! impl_vector2_consts {
         impl Vector<$type, 2> {
             pub const RIGHT: Self = Vector {
                 data: [1.0, 0.0],
+                #[cfg(feature = "remember_normalization")]
                 normalized: true,
             };
             pub const UP: Self = Vector {
                 data: [0.0, 1.0],
+                #[cfg(feature = "remember_normalization")]
                 normalized: true,
             };
             pub const LEFT: Self = Vector {
                 data: [-1.0, 0.0],
+                #[cfg(feature = "remember_normalization")]
                 normalized: true,
             };
             pub const DOWN: Self = Vector {
                 data: [0.0, -1.0],
+                #[cfg(feature = "remember_normalization")]
                 normalized: true,
             };
 
@@ -264,26 +279,32 @@ macro_rules! impl_vector3_consts {
         impl Vector<$type, 3> {
             pub const RIGHT: Self = Vector {
                 data: [1.0, 0.0, 0.0],
+                #[cfg(feature = "remember_normalization")]
                 normalized: true,
             };
             pub const UP: Self = Vector {
                 data: [0.0, 1.0, 0.0],
+                #[cfg(feature = "remember_normalization")]
                 normalized: true,
             };
             pub const FORWARD: Self = Vector {
                 data: [0.0, 0.0, 1.0],
+                #[cfg(feature = "remember_normalization")]
                 normalized: true,
             };
             pub const LEFT: Self = Vector {
                 data: [-1.0, 0.0, 0.0],
+                #[cfg(feature = "remember_normalization")]
                 normalized: true,
             };
             pub const DOWN: Self = Vector {
                 data: [0.0, -1.0, 0.0],
+                #[cfg(feature = "remember_normalization")]
                 normalized: true,
             };
             pub const BACK: Self = Vector {
                 data: [0.0, 0.0, -1.0],
+                #[cfg(feature = "remember_normalization")]
                 normalized: true,
             };
 
@@ -327,4 +348,12 @@ fn subtraction() {
 #[test]
 fn dot() {
     assert_eq!(Vector::new([2, 7, 1]).dot(Vector::new([8, 2, 8])), 38)
+}
+
+#[test]
+fn cross() {
+    assert_eq!(
+        Vector::new([2, 3, 4]).cross(Vector::new([5, 6, 7])),
+        Vector::new([-3, 6, -3])
+    )
 }

@@ -7,37 +7,33 @@ pub struct Matrix<T: Element, const R: usize, const C: usize> {
     data: [[T; C]; R],
 }
 
-// pub type TransformationMatrix<T> = Matrix<T, 4, 4>;
+pub type TransformationMatrix<T> = Matrix<T, 4, 4>;
 
-// impl<T: Element, const R: usize, const C: usize> Matrix<T, R, C> {
-//     pub fn identity() -> Self {
-//         let mut res = [[T::zero(); C]; R];
-//         let mut i = 0;
+impl<T: Element, const R: usize, const C: usize> Matrix<T, R, C> {
+    pub fn identity() -> Self {
+        Self {
+            data: std::array::from_fn(|r| {
+                std::array::from_fn(|c| if r == c { T::one() } else { T::zero() })
+            }),
+        }
+    }
 
-//         while i < R {
-//             res[i][i] = T::one();
-//             i += 1;
-//         }
+    pub fn translate(mut self, vec: Vector<T, R>) -> Self {
+        for r in 0..R {
+            self.data[r][C - 1] += vec[r];
+        }
 
-//         Self { data: res }
-//     }
+        self
+    }
 
-//     pub fn translate(mut self, vec: Vector<T, R>) -> Self {
-//         for r in 0..R {
-//             self.data[r][C - 1] += vec[r];
-//         }
+    pub fn scale(mut self, vec: Vector<T, R>) -> Self {
+        for r in 0..R {
+            self.data[r][r] *= vec[r];
+        }
 
-//         self
-//     }
-
-//     pub fn scale(mut self, vec: Vector<T, R>) -> Self {
-//         for r in 0..R {
-//             self.data[r][r] *= vec[r];
-//         }
-
-//         self
-//     }
-// }
+        self
+    }
+}
 
 impl<T: Element, const R: usize, const C: usize> Index<usize> for Matrix<T, R, C> {
     type Output = [T; C];
@@ -48,40 +44,48 @@ impl<T: Element, const R: usize, const C: usize> Index<usize> for Matrix<T, R, C
     }
 }
 
-// impl<T: Element, const R1: usize, const C1: usize, const C2: usize> Mul<Matrix<T, C1, C2>>
-//     for Matrix<T, R1, C1>
-// {
-//     type Output = Matrix<T, R1, C2>;
+impl<T: Element, const R1: usize, const C1: usize, const C2: usize> Mul<Matrix<T, C1, C2>>
+    for Matrix<T, R1, C1>
+{
+    type Output = Matrix<T, R1, C2>;
 
-//     fn mul(self, rhs: Matrix<T, C1, C2>) -> Self::Output {
-//         let mut res = [[T::zero(); C2]; R1];
+    fn mul(self, rhs: Matrix<T, C1, C2>) -> Self::Output {
+        let mut res = [[T::zero(); C2]; R1];
 
-//         for (index, row) in self.data.into_iter().enumerate() {
-//             for c2 in 0..C2 {
-//                 res[index][c2] = row
-//                     .into_iter()
-//                     .zip(rhs.data.into_iter().map(|r| r[c2]))
-//                     .map(|(l, r)| l * r)
-//                     .sum();
-//             }
-//         }
+        for (index, row) in self.data.into_iter().enumerate() {
+            for c2 in 0..C2 {
+                res[index][c2] = row
+                    .into_iter()
+                    .zip(rhs.data.into_iter().map(|r| r[c2]))
+                    .map(|(l, r)| l * r)
+                    .sum();
+            }
+        }
 
-//         res.into()
-//     }
-// }
+        res.into()
+    }
+}
 
-// impl<T: Element, const R1: usize, const C1: usize> Mul<Vector<T, C1>> for Matrix<T, R1, C1> {
-//     type Output = Vector<T, R1>;
+impl<T: Element, const R1: usize, const C1: usize> Mul<Vector<T, C1>> for Matrix<T, R1, C1> {
+    type Output = Vector<T, R1>;
 
-//     #[inline]
-//     fn mul(self, rhs: Vector<T, C1>) -> Self::Output {
-//         (self * rhs.column_matrix()).into()
-//     }
-// }
+    #[inline]
+    fn mul(self, rhs: Vector<T, C1>) -> Self::Output {
+        (self * rhs.column_matrix()).into()
+    }
+}
 
 impl<T: Element, const R: usize, const C: usize> From<[[T; C]; R]> for Matrix<T, R, C> {
     #[inline]
     fn from(value: [[T; C]; R]) -> Self {
         Self { data: value }
     }
+}
+
+#[test]
+fn mul() {
+    assert_eq!(
+        Matrix::from([[1, 7], [2, 4]]) * Matrix::from([[3, 3], [5, 2]]),
+        Matrix::from([[38, 17], [26, 14]])
+    )
 }
