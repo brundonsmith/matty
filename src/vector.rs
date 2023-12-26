@@ -1,30 +1,63 @@
-use std::{
-    fmt::{Display, Write},
-    iter::Sum,
-    ops::{Add, Div, Index, Mul, Sub},
-};
-
 use num_traits::real::Real;
+use std::{iter::Sum, ops::Index};
 
-use crate::{Element, Matrix};
-
-/**
- * Interface for vectors
- */
-pub trait IVector<T: Element, const N: usize> {
-    fn new(data: [T; N]) -> Self;
-
-    fn to_array(self) -> [T; N];
-
+pub trait Vector<T, const N: usize>: Index<usize, Output = T> {
     fn dot(self, other: Self) -> T;
 
     fn cross(self, other: Self) -> Self;
 }
 
-/**
- * Interface for vectors holding real numbers
- */
-pub trait IRealVector<T: Element + Real, const N: usize> {
+pub trait Vector2<T>: Index<usize> {
+    fn new(x: T, y: T) -> Self;
+
+    fn x(&self) -> T;
+
+    fn y(&self) -> T;
+}
+
+pub trait Vector3<T>: Index<usize> {
+    fn new(x: T, y: T, z: T) -> Self;
+
+    fn x(&self) -> T;
+
+    fn y(&self) -> T;
+
+    fn z(&self) -> T;
+}
+
+pub trait Vector2Swizzle<T>: Vector2<T> {
+    fn xy(&self) -> Self;
+
+    fn yx(&self) -> Self;
+}
+
+pub trait Vector3Swizzle<T, V2: Vector2<T>>: Vector3<T> {
+    fn xy(&self) -> V2;
+
+    fn yx(&self) -> V2;
+
+    fn xz(&self) -> V2;
+
+    fn zx(&self) -> V2;
+
+    fn yz(&self) -> V2;
+
+    fn zy(&self) -> V2;
+
+    fn xyz(&self) -> Self;
+
+    fn xzy(&self) -> Self;
+
+    fn yzx(&self) -> Self;
+
+    fn yxz(&self) -> Self;
+
+    fn zxy(&self) -> Self;
+
+    fn zyx(&self) -> Self;
+}
+
+pub trait RealVector<T: Real, const N: usize> {
     fn magnitude(self) -> T;
 
     fn normalized(self) -> Self;
@@ -32,328 +65,228 @@ pub trait IRealVector<T: Element + Real, const N: usize> {
     fn angle_to(self, other: Self) -> T;
 }
 
-/**
- * Regular Vector struct. Can be used with any type of number and any number of
- * elements. Implements various vector math operations.
- */
-#[derive(Debug, Clone, Copy, PartialEq, PartialOrd)]
-pub struct Vector<T: Element, const N: usize> {
-    data: [T; N],
+pub trait VectorAdd<T, const N: usize> {
+    fn add(self, other: Self) -> Self;
 
-    #[cfg(feature = "remember_normalization")]
-    normalized: bool,
+    fn add_scalar(self, scalar: T) -> Self;
 }
 
-impl<T: Element, const N: usize> Vector<T, N> {
-    #[inline]
-    pub fn resize<const N2: usize>(self) -> Vector<T, N2> {
-        std::array::from_fn(|i| self.data.get(i).map(|x| *x).unwrap_or(T::default())).into()
-    }
+pub trait VectorSub<T, const N: usize> {
+    fn sub(self, other: Self) -> Self;
 
-    #[inline]
-    pub fn column_matrix(self) -> Matrix<T, N, 1> {
-        std::array::from_fn(|i| [self.data[i]]).into()
-    }
-
-    #[inline]
-    pub fn row_matrix(self) -> Matrix<T, 1, N> {
-        [self.data].into()
-    }
+    fn sub_scalar(self, scalar: T) -> Self;
 }
 
-impl<T: Element, const N: usize> IVector<T, N> for Vector<T, N> {
+pub trait VectorMul<T, const N: usize> {
+    fn mul(self, other: Self) -> Self;
+
+    fn mul_scalar(self, scalar: T) -> Self;
+}
+
+pub trait VectorDiv<T, const N: usize> {
+    fn div(self, other: Self) -> Self;
+
+    fn div_scalar(self, scalar: T) -> Self;
+}
+
+/// Implementations for array
+
+impl<
+        T: Copy + Default + std::ops::Mul<Output = T> + std::ops::Sub<Output = T> + Sum<T>,
+        const N: usize,
+    > Vector<T, N> for [T; N]
+{
     #[inline]
-    fn new(data: [T; N]) -> Self {
-        Self {
-            data,
-            #[cfg(feature = "remember_normalization")]
-            normalized: false,
-        }
+    fn dot(self, other: Self) -> T {
+        self.mul(other).into_iter().sum()
     }
 
     #[inline]
-    fn to_array(self) -> [T; N] {
-        self.data
-    }
-
-    #[inline]
-    fn dot(self, other: Vector<T, N>) -> T {
-        self.data
-            .into_iter()
-            .zip(other.data.into_iter())
-            .map(|(s, o)| s * o)
-            .sum()
-    }
-
-    #[inline]
-    fn cross(self, other: Vector<T, N>) -> Vector<T, N> {
-        let mut res = [T::zero(); N];
+    fn cross(self, other: Self) -> Self {
+        let mut res = [T::default(); N];
 
         for i in 0..N {
-            res[i] = self.data[(i + 1) % N] * other.data[(i + 2) % N]
-                - self.data[(i + 2) % N] * other.data[(i + 1) % N];
+            res[i] =
+                self[(i + 1) % N] * other[(i + 2) % N] - self[(i + 2) % N] * other[(i + 1) % N];
         }
 
         res.into()
     }
 }
 
-impl<T: Element + Real, const N: usize> IRealVector<T, N> for Vector<T, N> {
+impl<T: Copy> Vector2<T> for [T; 2] {
+    #[inline]
+    fn new(x: T, y: T) -> Self {
+        [x, y]
+    }
+
+    #[inline]
+    fn x(&self) -> T {
+        self[0]
+    }
+
+    #[inline]
+    fn y(&self) -> T {
+        self[1]
+    }
+}
+
+impl<T: Copy> Vector3<T> for [T; 3] {
+    #[inline]
+    fn new(x: T, y: T, z: T) -> Self {
+        [x, y, z]
+    }
+
+    #[inline]
+    fn x(&self) -> T {
+        self[0]
+    }
+
+    #[inline]
+    fn y(&self) -> T {
+        self[1]
+    }
+
+    #[inline]
+    fn z(&self) -> T {
+        self[2]
+    }
+}
+
+impl<T: Copy, V: Vector2<T>> Vector2Swizzle<T> for V {
+    #[inline]
+    fn xy(&self) -> Self {
+        V::new(self.x(), self.y())
+    }
+
+    #[inline]
+    fn yx(&self) -> Self {
+        V::new(self.y(), self.x())
+    }
+}
+
+impl<T: Copy, V3: Vector3<T>, V2: Vector2<T>> Vector3Swizzle<T, V2> for V3 {
+    #[inline]
+    fn xy(&self) -> V2 {
+        V2::new(self.x(), self.y())
+    }
+
+    #[inline]
+    fn yx(&self) -> V2 {
+        V2::new(self.y(), self.x())
+    }
+
+    #[inline]
+    fn xz(&self) -> V2 {
+        V2::new(self.x(), self.z())
+    }
+
+    #[inline]
+    fn zx(&self) -> V2 {
+        V2::new(self.z(), self.x())
+    }
+
+    #[inline]
+    fn yz(&self) -> V2 {
+        V2::new(self.y(), self.z())
+    }
+
+    #[inline]
+    fn zy(&self) -> V2 {
+        V2::new(self.z(), self.y())
+    }
+
+    #[inline]
+    fn xyz(&self) -> Self {
+        Self::new(self.x(), self.y(), self.z())
+    }
+
+    #[inline]
+    fn xzy(&self) -> Self {
+        Self::new(self.x(), self.z(), self.y())
+    }
+
+    #[inline]
+    fn yzx(&self) -> Self {
+        Self::new(self.y(), self.z(), self.x())
+    }
+
+    #[inline]
+    fn yxz(&self) -> Self {
+        Self::new(self.y(), self.x(), self.z())
+    }
+
+    #[inline]
+    fn zxy(&self) -> Self {
+        Self::new(self.z(), self.x(), self.y())
+    }
+
+    #[inline]
+    fn zyx(&self) -> Self {
+        Self::new(self.z(), self.y(), self.x())
+    }
+}
+
+impl<
+        T: Copy + Default + std::ops::Mul<Output = T> + std::ops::Sub<Output = T> + Sum<T> + Real,
+        const N: usize,
+    > RealVector<T, N> for [T; N]
+{
     #[inline]
     fn magnitude(self) -> T {
-        self.data.into_iter().map(|n| n * n).sum::<T>().sqrt()
+        self.into_iter().map(|n| n * n).sum::<T>().sqrt()
     }
 
     #[inline]
-    fn normalized(self) -> Vector<T, N> {
-        #[cfg(feature = "remember_normalization")]
-        if self.normalized {
-            return self;
-        }
-
-        let mut res = self / self.magnitude();
-
-        #[cfg(feature = "remember_normalization")]
-        {
-            res.normalized = true;
-        }
-
-        res
+    fn normalized(self) -> Self {
+        self.div_scalar(self.magnitude())
     }
 
     #[inline]
-    fn angle_to(self, other: Vector<T, N>) -> T {
+    fn angle_to(self, other: Self) -> T {
         self.normalized().dot(other.normalized()).acos()
     }
 }
 
-impl<T: Element, const N: usize> Display for Vector<T, N> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.write_char('(')?;
-        for n in 0..N {
-            if n > 0 {
-                f.write_str(", ")?;
-            }
-
-            f.write_fmt(format_args!("{}", self.data[n]))?;
-        }
-        f.write_char(')')
-    }
-}
-
-impl<T: Element, const N: usize> Index<usize> for Vector<T, N> {
-    type Output = T;
-
-    #[inline]
-    fn index(&self, index: usize) -> &Self::Output {
-        &self.data[index]
-    }
-}
-
-impl<T: Element, const N: usize> Default for Vector<T, N> {
-    #[inline]
-    fn default() -> Self {
-        Self {
-            data: [T::default(); N].into(),
-            #[cfg(feature = "remember_normalization")]
-            normalized: Default::default(),
-        }
-    }
-}
-
-/// From traits
-
-impl<T: Element, const N: usize> From<[T; N]> for Vector<T, N> {
-    #[inline]
-    fn from(value: [T; N]) -> Self {
-        Vector::new(value)
-    }
-}
-
-impl<T: Element, const N: usize> From<Vector<T, N>> for [T; N] {
-    #[inline]
-    fn from(value: Vector<T, N>) -> Self {
-        value.data
-    }
-}
-
-impl<T: Element, const N: usize> From<Matrix<T, N, 1>> for Vector<T, N> {
-    #[inline]
-    fn from(value: Matrix<T, N, 1>) -> Self {
-        std::array::from_fn(|i| value[i][0]).into()
-    }
-}
-
-/// Math traits
-
-impl<T: Element, const N: usize> Add<Vector<T, N>> for Vector<T, N> {
-    type Output = Self;
-
-    #[inline]
-    fn add(self, rhs: Vector<T, N>) -> Self::Output {
-        std::array::from_fn(|i| self.data[i] + rhs.data[i]).into()
-    }
-}
-
-impl<T: Element, const N: usize> Sub<Vector<T, N>> for Vector<T, N> {
-    type Output = Vector<T, N>;
-
-    #[inline]
-    fn sub(self, rhs: Vector<T, N>) -> Self::Output {
-        std::array::from_fn(|i| self.data[i] - rhs.data[i]).into()
-    }
-}
-
-impl<T: Element, const N: usize> Mul<T> for Vector<T, N> {
-    type Output = Vector<T, N>;
-
-    #[inline]
-    fn mul(self, rhs: T) -> Self::Output {
-        std::array::from_fn(|i| self.data[i] * rhs).into()
-    }
-}
-
-impl<T: Element, const N: usize> Div<T> for Vector<T, N> {
-    type Output = Vector<T, N>;
-
-    #[inline]
-    fn div(self, rhs: T) -> Self::Output {
-        self * (T::one() / rhs)
-    }
-}
-
-impl<T: Element, const N: usize> Sum for Vector<T, N>
-where
-    Vector<T, N>: Add<Output = Vector<T, N>>,
-{
-    #[inline]
-    fn sum<I: Iterator<Item = Vector<T, N>>>(iter: I) -> Self {
-        iter.fold(Self::default(), Add::add)
-    }
-}
-
-/// Convenience consts
-
-macro_rules! impl_vector2_consts {
-    ($type:ident) => {
-        impl Vector<$type, 2> {
-            pub const RIGHT: Self = Vector {
-                data: [1.0, 0.0],
-                #[cfg(feature = "remember_normalization")]
-                normalized: true,
-            };
-            pub const UP: Self = Vector {
-                data: [0.0, 1.0],
-                #[cfg(feature = "remember_normalization")]
-                normalized: true,
-            };
-            pub const LEFT: Self = Vector {
-                data: [-1.0, 0.0],
-                #[cfg(feature = "remember_normalization")]
-                normalized: true,
-            };
-            pub const DOWN: Self = Vector {
-                data: [0.0, -1.0],
-                #[cfg(feature = "remember_normalization")]
-                normalized: true,
-            };
-
+macro_rules! array_op {
+    ($vectortrait:ident, $optrait:ident, $fullmethod:ident, $scalarmethod:ident) => {
+        impl<T: Copy + std::ops::$optrait<Output = T>, const N: usize> $vectortrait<T, N>
+            for [T; N]
+        {
             #[inline]
-            pub fn x(self) -> $type {
-                self.data[0]
+            fn $fullmethod(self, other: Self) -> Self {
+                std::array::from_fn(|i| std::ops::$optrait::$fullmethod(self[i], other[i]))
             }
 
             #[inline]
-            pub fn y(self) -> $type {
-                self.data[1]
+            fn $scalarmethod(self, scalar: T) -> Self {
+                std::array::from_fn(|i| std::ops::$optrait::$fullmethod(self[i], scalar))
             }
         }
     };
 }
 
-impl_vector2_consts!(f32);
-impl_vector2_consts!(f64);
-
-macro_rules! impl_vector3_consts {
-    ($type:ident) => {
-        impl Vector<$type, 3> {
-            pub const RIGHT: Self = Vector {
-                data: [1.0, 0.0, 0.0],
-                #[cfg(feature = "remember_normalization")]
-                normalized: true,
-            };
-            pub const UP: Self = Vector {
-                data: [0.0, 1.0, 0.0],
-                #[cfg(feature = "remember_normalization")]
-                normalized: true,
-            };
-            pub const FORWARD: Self = Vector {
-                data: [0.0, 0.0, 1.0],
-                #[cfg(feature = "remember_normalization")]
-                normalized: true,
-            };
-            pub const LEFT: Self = Vector {
-                data: [-1.0, 0.0, 0.0],
-                #[cfg(feature = "remember_normalization")]
-                normalized: true,
-            };
-            pub const DOWN: Self = Vector {
-                data: [0.0, -1.0, 0.0],
-                #[cfg(feature = "remember_normalization")]
-                normalized: true,
-            };
-            pub const BACK: Self = Vector {
-                data: [0.0, 0.0, -1.0],
-                #[cfg(feature = "remember_normalization")]
-                normalized: true,
-            };
-
-            #[inline]
-            pub fn x(self) -> $type {
-                self.data[0]
-            }
-
-            #[inline]
-            pub fn y(self) -> $type {
-                self.data[1]
-            }
-
-            #[inline]
-            pub fn z(self) -> $type {
-                self.data[2]
-            }
-        }
-    };
-}
-
-impl_vector3_consts! {f32}
-impl_vector3_consts! {f64}
+array_op!(VectorAdd, Add, add, add_scalar);
+array_op!(VectorSub, Sub, sub, sub_scalar);
+array_op!(VectorMul, Mul, mul, mul_scalar);
+array_op!(VectorDiv, Div, div, div_scalar);
 
 #[test]
 fn addition() {
-    assert_eq!(
-        Vector::new([4, 5]) + Vector::new([12, 2]),
-        Vector::new([16, 7])
-    )
+    assert_eq!([4, 5].add([12, 2]), [16, 7])
 }
 
 #[test]
 fn subtraction() {
-    assert_eq!(
-        Vector::new([4, 5]) - Vector::new([12, 2]),
-        Vector::new([-8, 3])
-    )
+    assert_eq!([4, 5].sub([12, 2]), [-8, 3])
 }
 
 #[test]
 fn dot() {
-    assert_eq!(Vector::new([2, 7, 1]).dot(Vector::new([8, 2, 8])), 38)
+    assert_eq!([2, 7, 1].dot([8, 2, 8]), 38)
 }
 
 #[test]
 fn cross() {
-    assert_eq!(
-        Vector::new([2, 3, 4]).cross(Vector::new([5, 6, 7])),
-        Vector::new([-3, 6, -3])
-    )
+    assert_eq!([2, 3, 4].cross([5, 6, 7]), [-3, 6, -3])
 }

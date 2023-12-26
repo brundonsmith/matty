@@ -1,91 +1,80 @@
-use std::ops::{Index, Mul};
+use std::{
+    iter::Sum,
+    ops::{AddAssign, MulAssign},
+};
 
-use crate::{Element, Vector};
+use num_traits::{One, Zero};
 
-#[derive(Debug, Clone, Copy, PartialEq, PartialOrd)]
-pub struct Matrix<T: Element, const R: usize, const C: usize> {
-    data: [[T; C]; R],
+use crate::{Vector, VectorMul};
+
+pub trait Matrix<T, const R: usize, const C: usize> {
+    fn identity() -> Self;
+
+    fn translate<V: Vector<T, R>>(self, vec: V) -> Self;
+
+    fn scale<V: Vector<T, R>>(self, vec: V) -> Self;
 }
 
-pub type TransformationMatrix<T> = Matrix<T, 4, 4>;
-
-impl<T: Element, const R: usize, const C: usize> Matrix<T, R, C> {
-    pub fn identity() -> Self {
-        Self {
-            data: std::array::from_fn(|r| {
-                std::array::from_fn(|c| if r == c { T::one() } else { T::zero() })
-            }),
-        }
-    }
-
-    pub fn translate(mut self, vec: Vector<T, R>) -> Self {
-        for r in 0..R {
-            self.data[r][C - 1] += vec[r];
-        }
-
-        self
-    }
-
-    pub fn scale(mut self, vec: Vector<T, R>) -> Self {
-        for r in 0..R {
-            self.data[r][r] *= vec[r];
-        }
-
-        self
-    }
-}
-
-impl<T: Element, const R: usize, const C: usize> Index<usize> for Matrix<T, R, C> {
-    type Output = [T; C];
-
-    #[inline]
-    fn index(&self, index: usize) -> &Self::Output {
-        &self.data[index]
-    }
-}
-
-impl<T: Element, const R1: usize, const C1: usize, const C2: usize> Mul<Matrix<T, C1, C2>>
-    for Matrix<T, R1, C1>
+pub trait MatrixMul<
+    T,
+    const R1: usize,
+    const C1: usize,
+    const C2: usize,
+    MOther: Matrix<T, C1, C2>,
+    MResult: Matrix<T, R1, C2>,
+>
 {
-    type Output = Matrix<T, R1, C2>;
+    fn mul(self, other: MOther) -> MResult;
+}
 
-    fn mul(self, rhs: Matrix<T, C1, C2>) -> Self::Output {
-        let mut res = [[T::zero(); C2]; R1];
+impl<T: Copy + Zero + One + AddAssign + MulAssign, const R: usize, const C: usize> Matrix<T, R, C>
+    for [[T; C]; R]
+{
+    #[inline]
+    fn identity() -> Self {
+        std::array::from_fn(|r| std::array::from_fn(|c| if r == c { T::one() } else { T::zero() }))
+    }
 
-        for (index, row) in self.data.into_iter().enumerate() {
-            for c2 in 0..C2 {
-                res[index][c2] = row
-                    .into_iter()
-                    .zip(rhs.data.into_iter().map(|r| r[c2]))
-                    .map(|(l, r)| l * r)
-                    .sum();
-            }
+    #[inline]
+    fn translate<V: Vector<T, R>>(mut self, vec: V) -> Self {
+        for r in 0..R {
+            self[r][C - 1] += vec[r];
         }
 
-        res.into()
+        self
+    }
+
+    #[inline]
+    fn scale<V: Vector<T, R>>(mut self, vec: V) -> Self {
+        for r in 0..R {
+            self[r][r] *= vec[r];
+        }
+
+        self
     }
 }
 
-impl<T: Element, const R1: usize, const C1: usize> Mul<Vector<T, C1>> for Matrix<T, R1, C1> {
-    type Output = Vector<T, R1>;
-
+impl<
+        T: Copy + Zero + One + AddAssign + MulAssign + Sum<T>,
+        const R1: usize,
+        const C1: usize,
+        const C2: usize,
+    > MatrixMul<T, R1, C1, C2, [[T; C2]; C1], [[T; C2]; R1]> for [[T; C1]; R1]
+{
     #[inline]
-    fn mul(self, rhs: Vector<T, C1>) -> Self::Output {
-        (self * rhs.column_matrix()).into()
-    }
-}
+    fn mul(self, other: [[T; C2]; C1]) -> [[T; C2]; R1] {
+        std::array::from_fn(|index| {
+            let row = self[index];
 
-impl<T: Element, const R: usize, const C: usize> From<[[T; C]; R]> for Matrix<T, R, C> {
-    #[inline]
-    fn from(value: [[T; C]; R]) -> Self {
-        Self { data: value }
+            std::array::from_fn(|c2| {
+                let col = std::array::from_fn(|i| other[i][c2]);
+                row.mul(col).into_iter().sum()
+            })
+        })
     }
 }
 
 #[test]
 fn mul() {
-    assert_eq!(
-        Matrix::from([[1, 7], [2, 4]]) * Matrix::from([[3, 3], [5, 2]]),
-        Matrix::from([[38, 17], [26, 14]])
-    )
+    assert_eq!([[1, 7], [2, 4]].mul([[3, 3], [5, 2]]), [[38, 17], [26, 14]])
 }
