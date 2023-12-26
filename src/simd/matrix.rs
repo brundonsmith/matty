@@ -43,11 +43,20 @@ where
 }
 
 impl<
-        T: Copy + Zero + One + AddAssign + MulAssign + Sum<T> + SimdElement,
+        T: Copy
+            + Default
+            + Zero
+            + One
+            + AddAssign
+            + MulAssign
+            + std::ops::Sub<T, Output = T>
+            + Sum<T>
+            + SimdElement,
         const R1: usize,
         const C1: usize,
         const C2: usize,
-    > MatrixMul<T, R1, C1, C2, [Simd<T, C2>; C1], [Simd<T, C2>; R1]> for [Simd<T, C1>; R1]
+    > MatrixMul<T, R1, C1, C2, [Simd<T, C2>; C1], [Simd<T, C2>; R1], Simd<T, C1>, [T; R1]>
+    for [Simd<T, C1>; R1]
 where
     LaneCount<C1>: SupportedLaneCount,
     LaneCount<C2>: SupportedLaneCount,
@@ -64,6 +73,11 @@ where
             })
             .into()
         })
+    }
+
+    #[inline]
+    fn mul_vec(self, other: Simd<T, C1>) -> [T; R1] {
+        std::array::from_fn(|index| self[index].dot(other))
     }
 }
 

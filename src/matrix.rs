@@ -22,9 +22,13 @@ pub trait MatrixMul<
     const C2: usize,
     MOther: Matrix<T, C1, C2>,
     MResult: Matrix<T, R1, C2>,
+    VOther: Vector<T, C1>,
+    VResult: Vector<T, R1>,
 >
 {
     fn mul(self, other: MOther) -> MResult;
+
+    fn mul_vec(self, other: VOther) -> VResult;
 }
 
 impl<T: Copy + Zero + One + AddAssign + MulAssign, const R: usize, const C: usize> Matrix<T, R, C>
@@ -55,11 +59,11 @@ impl<T: Copy + Zero + One + AddAssign + MulAssign, const R: usize, const C: usiz
 }
 
 impl<
-        T: Copy + Zero + One + AddAssign + MulAssign + Sum<T>,
+        T: Copy + Default + Zero + One + AddAssign + MulAssign + std::ops::Sub<T, Output = T> + Sum<T>,
         const R1: usize,
         const C1: usize,
         const C2: usize,
-    > MatrixMul<T, R1, C1, C2, [[T; C2]; C1], [[T; C2]; R1]> for [[T; C1]; R1]
+    > MatrixMul<T, R1, C1, C2, [[T; C2]; C1], [[T; C2]; R1], [T; C1], [T; R1]> for [[T; C1]; R1]
 {
     #[inline]
     fn mul(self, other: [[T; C2]; C1]) -> [[T; C2]; R1] {
@@ -71,6 +75,11 @@ impl<
                 row.mul(col).into_iter().sum()
             })
         })
+    }
+
+    #[inline]
+    fn mul_vec(self, other: [T; C1]) -> [T; R1] {
+        std::array::from_fn(|index| self[index].dot(other))
     }
 }
 
