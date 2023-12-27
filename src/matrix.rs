@@ -87,6 +87,7 @@ impl<
         const C: usize,
     > MatrixVectorMul<T, R, C, ArrayVector<T, C>, ArrayVector<T, R>> for ArrayMatrix<T, R, C>
 {
+    #[inline]
     fn mul_vec(self, vec: ArrayVector<T, C>) -> ArrayVector<T, R> {
         std::array::from_fn(|index| self[index].dot(vec))
     }

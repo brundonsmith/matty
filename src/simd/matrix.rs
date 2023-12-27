@@ -6,7 +6,9 @@ use std::{
 
 use num_traits::{One, Zero};
 
-use crate::{ArrayMatrix, Matrix, MatrixMul, Vector};
+use crate::{ArrayMatrix, Matrix, MatrixMul, MatrixVectorMul, Vector};
+
+use super::SimdVector;
 
 pub type SimdMatrix<T, const R: usize, const C: usize> = [Simd<T, C>; R];
 
@@ -74,6 +76,28 @@ where
                 (row * col).to_array().into_iter().sum()
             }))
         })
+    }
+}
+
+impl<
+        T: Copy
+            + Default
+            + std::ops::Mul<Output = T>
+            + std::ops::Sub<Output = T>
+            + Sum<T>
+            + SimdElement,
+        const R: usize,
+        const C: usize,
+    > MatrixVectorMul<T, R, C, SimdVector<T, C>, SimdVector<T, R>> for SimdMatrix<T, R, C>
+where
+    LaneCount<R>: SupportedLaneCount,
+    LaneCount<C>: SupportedLaneCount,
+    Simd<T, R>: std::ops::Mul<Output = Simd<T, R>>,
+    Simd<T, C>: std::ops::Mul<Output = Simd<T, C>>,
+{
+    #[inline]
+    fn mul_vec(self, vec: SimdVector<T, C>) -> SimdVector<T, R> {
+        Simd::from(std::array::from_fn(|index| self[index].dot(vec)))
     }
 }
 
