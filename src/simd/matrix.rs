@@ -6,13 +6,15 @@ use std::{
 
 use num_traits::{One, Zero};
 
-use crate::{Matrix, MatrixMul, Vector};
+use crate::{ArrayMatrix, Matrix, MatrixMul, Vector};
+
+pub type SimdMatrix<T, const R: usize, const C: usize> = [Simd<T, C>; R];
 
 impl<
         T: Copy + Zero + One + AddAssign + MulAssign + SimdElement,
         const R: usize,
         const C: usize,
-    > Matrix<T, R, C> for [Simd<T, C>; R]
+    > Matrix<T, R, C> for SimdMatrix<T, R, C>
 where
     LaneCount<C>: SupportedLaneCount,
 {
@@ -55,45 +57,38 @@ impl<
         const R1: usize,
         const C1: usize,
         const C2: usize,
-    > MatrixMul<T, R1, C1, C2, [Simd<T, C2>; C1], [Simd<T, C2>; R1], Simd<T, C1>, [T; R1]>
-    for [Simd<T, C1>; R1]
+    > MatrixMul<T, R1, C1, C2, SimdMatrix<T, C1, C2>, SimdMatrix<T, R1, C2>>
+    for SimdMatrix<T, R1, C1>
 where
     LaneCount<C1>: SupportedLaneCount,
     LaneCount<C2>: SupportedLaneCount,
     Simd<T, C1>: std::ops::Mul<Output = Simd<T, C1>>,
 {
     #[inline]
-    fn mul(self, other: [Simd<T, C2>; C1]) -> [Simd<T, C2>; R1] {
+    fn mul(self, other: SimdMatrix<T, C1, C2>) -> SimdMatrix<T, R1, C2> {
         std::array::from_fn(|index| {
             let row = Simd::from(self[index]);
 
-            std::array::from_fn(|c2| {
+            Simd::from(std::array::from_fn(|c2| {
                 let col = Simd::from(std::array::from_fn(|i| other[i][c2]));
                 (row * col).to_array().into_iter().sum()
-            })
-            .into()
+            }))
         })
     }
-
-    #[inline]
-    fn mul_vec(self, other: Simd<T, C1>) -> [T; R1] {
-        std::array::from_fn(|index| self[index].dot(other))
-    }
 }
 
-trait MatrixSimdify<T, const R: usize, const C: usize, M: Matrix<T, R, C>> {
-    fn simdify(self) -> M;
-}
-
-impl<
-        T: Copy + Zero + One + AddAssign + MulAssign + SimdElement,
-        const R: usize,
-        const C: usize,
-    > MatrixSimdify<T, R, C, [Simd<T, C>; R]> for [[T; C]; R]
+trait MatrixSimdify<T: SimdElement, const R: usize, const C: usize>
 where
     LaneCount<C>: SupportedLaneCount,
 {
-    fn simdify(self) -> [Simd<T, C>; R] {
+    fn simd(self) -> SimdMatrix<T, R, C>;
+}
+
+impl<T: SimdElement, const R: usize, const C: usize> MatrixSimdify<T, R, C> for ArrayMatrix<T, R, C>
+where
+    LaneCount<C>: SupportedLaneCount,
+{
+    fn simd(self) -> SimdMatrix<T, R, C> {
         std::array::from_fn(|i| Simd::from(self[i]))
     }
 }
@@ -101,7 +96,17 @@ where
 #[test]
 fn mul() {
     assert_eq!(
-        [[1, 7], [2, 4]].simdify().mul([[3, 3], [5, 2]].simdify()),
-        [[38, 17], [26, 14]].simdify()
+        [[1, 7], [2, 4]].simd().mul([[3, 3], [5, 2]].simd()),
+        [[38, 17], [26, 14]].simd()
+    )
+}
+
+#[test]
+fn mul_2() {
+    assert_eq!(
+        [[1, 2, 3, 4], [5, 6, 7, 8]]
+            .simd()
+            .mul([[9, 10], [11, 12], [13, 14], [15, 16]].simd()),
+        [[130, 140], [322, 348]].simd()
     )
 }

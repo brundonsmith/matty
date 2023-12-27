@@ -1,13 +1,15 @@
 use std::{
     iter::Sum,
-    ops::{AddAssign, MulAssign},
+    ops::{AddAssign, Index, MulAssign},
 };
 
 use num_traits::{One, Zero};
 
-use crate::{Vector, VectorMul};
+use crate::{ArrayVector, Vector, VectorMul};
 
-pub trait Matrix<T, const R: usize, const C: usize> {
+pub type ArrayMatrix<T, const R: usize, const C: usize> = [[T; C]; R];
+
+pub trait Matrix<T, const R: usize, const C: usize>: Index<usize> {
     fn identity() -> Self;
 
     fn translate<V: Vector<T, R>>(self, vec: V) -> Self;
@@ -22,17 +24,17 @@ pub trait MatrixMul<
     const C2: usize,
     MOther: Matrix<T, C1, C2>,
     MResult: Matrix<T, R1, C2>,
-    VOther: Vector<T, C1>,
-    VResult: Vector<T, R1>,
 >
 {
     fn mul(self, other: MOther) -> MResult;
+}
 
-    fn mul_vec(self, other: VOther) -> VResult;
+pub trait MatrixVectorMul<T, const R: usize, const C: usize, V1: Vector<T, C>, V2: Vector<T, R>> {
+    fn mul_vec(self, vec: V1) -> V2;
 }
 
 impl<T: Copy + Zero + One + AddAssign + MulAssign, const R: usize, const C: usize> Matrix<T, R, C>
-    for [[T; C]; R]
+    for ArrayMatrix<T, R, C>
 {
     #[inline]
     fn identity() -> Self {
@@ -63,10 +65,11 @@ impl<
         const R1: usize,
         const C1: usize,
         const C2: usize,
-    > MatrixMul<T, R1, C1, C2, [[T; C2]; C1], [[T; C2]; R1], [T; C1], [T; R1]> for [[T; C1]; R1]
+    > MatrixMul<T, R1, C1, C2, ArrayMatrix<T, C1, C2>, ArrayMatrix<T, R1, C2>>
+    for ArrayMatrix<T, R1, C1>
 {
     #[inline]
-    fn mul(self, other: [[T; C2]; C1]) -> [[T; C2]; R1] {
+    fn mul(self, other: ArrayMatrix<T, C1, C2>) -> ArrayMatrix<T, R1, C2> {
         std::array::from_fn(|index| {
             let row = self[index];
 
@@ -76,14 +79,33 @@ impl<
             })
         })
     }
+}
 
-    #[inline]
-    fn mul_vec(self, other: [T; C1]) -> [T; R1] {
-        std::array::from_fn(|index| self[index].dot(other))
+impl<
+        T: Copy + Default + std::ops::Mul<Output = T> + std::ops::Sub<Output = T> + Sum<T>,
+        const R: usize,
+        const C: usize,
+    > MatrixVectorMul<T, R, C, ArrayVector<T, C>, ArrayVector<T, R>> for ArrayMatrix<T, R, C>
+{
+    fn mul_vec(self, vec: ArrayVector<T, C>) -> ArrayVector<T, R> {
+        std::array::from_fn(|index| self[index].dot(vec))
     }
 }
 
 #[test]
 fn mul() {
     assert_eq!([[1, 7], [2, 4]].mul([[3, 3], [5, 2]]), [[38, 17], [26, 14]])
+}
+
+#[test]
+fn mul_2() {
+    assert_eq!(
+        [[1, 2, 3, 4], [5, 6, 7, 8], [9, 10, 11, 12]].mul([
+            [13, 14, 15],
+            [16, 17, 18],
+            [19, 20, 21],
+            [22, 23, 24]
+        ]),
+        [[190, 200, 210], [470, 496, 522], [750, 792, 834]]
+    )
 }

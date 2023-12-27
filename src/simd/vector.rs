@@ -5,7 +5,11 @@ use std::{
 
 use num_traits::real::Real;
 
-use crate::{RealVector, Vector, Vector2, Vector3, VectorAdd, VectorDiv, VectorMul, VectorSub};
+use crate::{
+    ArrayVector, RealVector, Vector, Vector2, Vector3, VectorAdd, VectorDiv, VectorMul, VectorSub,
+};
+
+pub type SimdVector<T, const N: usize> = Simd<T, N>;
 
 impl<
         T: Copy
@@ -15,10 +19,10 @@ impl<
             + Sum<T>
             + SimdElement,
         const N: usize,
-    > Vector<T, N> for Simd<T, N>
+    > Vector<T, N> for SimdVector<T, N>
 where
     LaneCount<N>: SupportedLaneCount,
-    Simd<T, N>: std::ops::Mul<Output = Simd<T, N>>,
+    SimdVector<T, N>: std::ops::Mul<Output = SimdVector<T, N>>,
 {
     #[inline]
     fn dot(self, other: Self) -> T {
@@ -38,7 +42,7 @@ where
     }
 }
 
-impl<T: SimdElement> Vector2<T> for Simd<T, 2> {
+impl<T: SimdElement> Vector2<T> for SimdVector<T, 2> {
     #[inline]
     fn new(x: T, y: T) -> Self {
         Simd::from([x, y])
@@ -55,7 +59,7 @@ impl<T: SimdElement> Vector2<T> for Simd<T, 2> {
     }
 }
 
-impl<T: Default + SimdElement> Vector3<T> for Simd<T, 4> {
+impl<T: Default + SimdElement> Vector3<T> for SimdVector<T, 4> {
     #[inline]
     fn new(x: T, y: T, z: T) -> Self {
         Simd::from([x, y, z, T::default()])
@@ -86,11 +90,11 @@ impl<
             + SimdElement
             + Real,
         const N: usize,
-    > RealVector<T, N> for Simd<T, N>
+    > RealVector<T, N> for SimdVector<T, N>
 where
     LaneCount<N>: SupportedLaneCount,
-    Simd<T, N>: std::ops::Mul<Output = Simd<T, N>>,
-    Simd<T, N>: std::ops::Div<Output = Simd<T, N>>,
+    SimdVector<T, N>: std::ops::Mul<Output = SimdVector<T, N>>,
+    SimdVector<T, N>: std::ops::Div<Output = SimdVector<T, N>>,
 {
     #[inline]
     fn magnitude(self) -> T {
@@ -112,10 +116,10 @@ macro_rules! simd_op {
     ($vectortrait:ident, $optrait:ident, $fullmethod:ident, $scalarmethod:ident) => {
         #[cfg(feature = "simd")]
         impl<T: Copy + std::ops::$optrait<Output = T> + SimdElement, const N: usize>
-            $vectortrait<T, N> for Simd<T, N>
+            $vectortrait<T, N> for SimdVector<T, N>
         where
             LaneCount<N>: SupportedLaneCount,
-            Simd<T, N>: std::ops::$optrait<Output = Simd<T, N>>,
+            SimdVector<T, N>: std::ops::$optrait<Output = SimdVector<T, N>>,
         {
             #[inline]
             fn $fullmethod(self, other: Self) -> Self {
@@ -148,4 +152,20 @@ fn subtraction() {
 #[test]
 fn dot() {
     assert_eq!([2, 3].dot([-1, -2]), -8)
+}
+
+trait VectorSimdify<T: SimdElement, const N: usize>
+where
+    LaneCount<N>: SupportedLaneCount,
+{
+    fn simd(self) -> SimdVector<T, N>;
+}
+
+impl<T: SimdElement, const N: usize> VectorSimdify<T, N> for ArrayVector<T, N>
+where
+    LaneCount<N>: SupportedLaneCount,
+{
+    fn simd(self) -> SimdVector<T, N> {
+        Simd::from(self)
+    }
 }

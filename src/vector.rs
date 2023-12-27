@@ -1,6 +1,8 @@
 use num_traits::real::Real;
 use std::{iter::Sum, ops::Index};
 
+pub type ArrayVector<T, const N: usize> = [T; N];
+
 pub trait Vector<T, const N: usize>: Index<usize, Output = T> {
     fn dot(self, other: Self) -> T;
 
@@ -94,7 +96,7 @@ pub trait VectorDiv<T, const N: usize> {
 impl<
         T: Copy + Default + std::ops::Mul<Output = T> + std::ops::Sub<Output = T> + Sum<T>,
         const N: usize,
-    > Vector<T, N> for [T; N]
+    > Vector<T, N> for ArrayVector<T, N>
 {
     #[inline]
     fn dot(self, other: Self) -> T {
@@ -230,7 +232,7 @@ impl<T: Copy, V3: Vector3<T>, V2: Vector2<T>> Vector3Swizzle<T, V2> for V3 {
 impl<
         T: Copy + Default + std::ops::Mul<Output = T> + std::ops::Sub<Output = T> + Sum<T> + Real,
         const N: usize,
-    > RealVector<T, N> for [T; N]
+    > RealVector<T, N> for ArrayVector<T, N>
 {
     #[inline]
     fn magnitude(self) -> T {
@@ -251,7 +253,7 @@ impl<
 macro_rules! array_op {
     ($vectortrait:ident, $optrait:ident, $fullmethod:ident, $scalarmethod:ident) => {
         impl<T: Copy + std::ops::$optrait<Output = T>, const N: usize> $vectortrait<T, N>
-            for [T; N]
+            for ArrayVector<T, N>
         {
             #[inline]
             fn $fullmethod(self, other: Self) -> Self {
