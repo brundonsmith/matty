@@ -3,7 +3,7 @@ use std::{iter::Sum, ops::Index};
 
 pub type ArrayVector<T, const N: usize> = [T; N];
 
-pub trait Vector<T, const N: usize>: Index<usize, Output = T> {
+pub trait Vector<T, const N: usize> {
     fn dot(self, other: Self) -> T;
 
     fn cross(self, other: Self) -> Self;

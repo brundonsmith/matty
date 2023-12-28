@@ -1,12 +1,12 @@
 use std::{
     iter::Sum,
-    ops::{AddAssign, MulAssign},
+    ops::{AddAssign, Index, MulAssign},
     simd::{LaneCount, Simd, SimdElement, SupportedLaneCount},
 };
 
 use num_traits::{One, Zero};
 
-use crate::{ArrayMatrix, MatrixMul, MatrixTransformation, MatrixVectorMul, Vector};
+use crate::{ArrayMatrix, ArrayVector, MatrixMul, MatrixTransformation, MatrixVectorMul, Vector};
 
 use super::SimdVector;
 
@@ -28,7 +28,7 @@ where
     }
 
     #[inline]
-    fn translate<V: Vector<T, R>>(mut self, vec: V) -> Self {
+    fn translate<V: Index<usize, Output = T>>(mut self, vec: V) -> Self {
         for r in 0..R {
             self[r][C - 1] += vec[r];
         }
@@ -37,7 +37,7 @@ where
     }
 
     #[inline]
-    fn scale<V: Vector<T, R>>(mut self, vec: V) -> Self {
+    fn scale<V: Index<usize, Output = T>>(mut self, vec: V) -> Self {
         for r in 0..R {
             self[r][r] *= vec[r];
         }
@@ -88,16 +88,14 @@ impl<
             + SimdElement,
         const R: usize,
         const C: usize,
-    > MatrixVectorMul<T, R, C, SimdVector<T, C>, SimdVector<T, R>> for SimdMatrix<T, R, C>
+    > MatrixVectorMul<T, R, C, SimdVector<T, C>, ArrayVector<T, R>> for SimdMatrix<T, R, C>
 where
-    LaneCount<R>: SupportedLaneCount,
     LaneCount<C>: SupportedLaneCount,
-    Simd<T, R>: std::ops::Mul<Output = Simd<T, R>>,
     Simd<T, C>: std::ops::Mul<Output = Simd<T, C>>,
 {
     #[inline]
-    fn mul_vec(self, vec: SimdVector<T, C>) -> SimdVector<T, R> {
-        Simd::from(std::array::from_fn(|index| self[index].dot(vec)))
+    fn mul_vec(self, vec: SimdVector<T, C>) -> ArrayVector<T, R> {
+        std::array::from_fn(|index| self[index].dot(vec))
     }
 }
 

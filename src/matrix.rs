@@ -12,16 +12,16 @@ pub type ArrayMatrix<T, const R: usize, const C: usize> = [[T; C]; R];
 pub trait MatrixTransformation<T, const R: usize, const C: usize>: Index<usize> {
     fn identity() -> Self;
 
-    fn translate<V: Vector<T, R>>(self, vec: V) -> Self;
+    fn translate<V: Index<usize, Output = T>>(self, vec: V) -> Self;
 
-    fn scale<V: Vector<T, R>>(self, vec: V) -> Self;
+    fn scale<V: Index<usize, Output = T>>(self, vec: V) -> Self;
 }
 
 pub trait MatrixMul<T, const R1: usize, const C1: usize, const C2: usize, MOther, MResult> {
     fn mul(self, other: MOther) -> MResult;
 }
 
-pub trait MatrixVectorMul<T, const R: usize, const C: usize, V1: Vector<T, C>, V2: Vector<T, R>> {
+pub trait MatrixVectorMul<T, const R: usize, const C: usize, V1, V2> {
     fn mul_vec(self, vec: V1) -> V2;
 }
 
@@ -34,7 +34,7 @@ impl<T: Copy + Zero + One + AddAssign + MulAssign, const R: usize, const C: usiz
     }
 
     #[inline]
-    fn translate<V: Vector<T, R>>(mut self, vec: V) -> Self {
+    fn translate<V: Index<usize, Output = T>>(mut self, vec: V) -> Self {
         for r in 0..R {
             self[r][C - 1] += vec[r];
         }
@@ -43,7 +43,7 @@ impl<T: Copy + Zero + One + AddAssign + MulAssign, const R: usize, const C: usiz
     }
 
     #[inline]
-    fn scale<V: Vector<T, R>>(mut self, vec: V) -> Self {
+    fn scale<V: Index<usize, Output = T>>(mut self, vec: V) -> Self {
         for r in 0..R {
             self[r][r] *= vec[r];
         }
