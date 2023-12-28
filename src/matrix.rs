@@ -9,7 +9,7 @@ use crate::{ArrayVector, Vector, VectorMul};
 
 pub type ArrayMatrix<T, const R: usize, const C: usize> = [[T; C]; R];
 
-pub trait Matrix<T, const R: usize, const C: usize>: Index<usize> {
+pub trait MatrixTransformation<T, const R: usize, const C: usize>: Index<usize> {
     fn identity() -> Self;
 
     fn translate<V: Vector<T, R>>(self, vec: V) -> Self;
@@ -17,15 +17,7 @@ pub trait Matrix<T, const R: usize, const C: usize>: Index<usize> {
     fn scale<V: Vector<T, R>>(self, vec: V) -> Self;
 }
 
-pub trait MatrixMul<
-    T,
-    const R1: usize,
-    const C1: usize,
-    const C2: usize,
-    MOther: Matrix<T, C1, C2>,
-    MResult: Matrix<T, R1, C2>,
->
-{
+pub trait MatrixMul<T, const R1: usize, const C1: usize, const C2: usize, MOther, MResult> {
     fn mul(self, other: MOther) -> MResult;
 }
 
@@ -33,8 +25,8 @@ pub trait MatrixVectorMul<T, const R: usize, const C: usize, V1: Vector<T, C>, V
     fn mul_vec(self, vec: V1) -> V2;
 }
 
-impl<T: Copy + Zero + One + AddAssign + MulAssign, const R: usize, const C: usize> Matrix<T, R, C>
-    for ArrayMatrix<T, R, C>
+impl<T: Copy + Zero + One + AddAssign + MulAssign, const R: usize, const C: usize>
+    MatrixTransformation<T, R, C> for ArrayMatrix<T, R, C>
 {
     #[inline]
     fn identity() -> Self {

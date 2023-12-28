@@ -6,7 +6,7 @@ use std::{
 
 use num_traits::{One, Zero};
 
-use crate::{ArrayMatrix, Matrix, MatrixMul, MatrixVectorMul, Vector};
+use crate::{ArrayMatrix, MatrixMul, MatrixTransformation, MatrixVectorMul, Vector};
 
 use super::SimdVector;
 
@@ -16,7 +16,7 @@ impl<
         T: Copy + Zero + One + AddAssign + MulAssign + SimdElement,
         const R: usize,
         const C: usize,
-    > Matrix<T, R, C> for SimdMatrix<T, R, C>
+    > MatrixTransformation<T, R, C> for SimdMatrix<T, R, C>
 where
     LaneCount<C>: SupportedLaneCount,
 {
