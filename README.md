@@ -20,6 +20,23 @@ fn main() {
         .translate([1.0, 0.0, 0.0])
         .scale([2.0, 2.0, 2.0]);
     let transformed_vec = transformation.mul_vec(vec);
+
+    let mat1 = [
+        [1, 2, 3, 4],
+        [5, 6, 7, 8]
+    ];
+    let mat2 = [
+        [1, 2],
+        [3, 4],
+        [5, 6],
+        [7, 8]
+    ];
+    let multiplied = mat1.mul(mat2);
+
+    // with `simd` feature enabled
+    let simd_vec_1 = [1, 2, 3, 4].simd();
+    let simd_vec_2 = [5, 6, 7, 8].simd();
+    let accelerated_sum = simd_vec_1.add(simd_vec_2);
 }
 ```
 
