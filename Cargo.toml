@@ -1,6 +1,7 @@
 [package]
 name = "matty"
 description = "A neat matrix and vector library"
+license = "MIT"
 version = "0.1.0"
 edition = "2021"
 
